@@ -22,10 +22,34 @@ cell-description:
     C_dl: 6e-3 #F/m2
     dy_elyte: 4e-6
   separator:
-    class: 'ionic_resistor'
-    thickness: 20e-6 # separator thickness, m
+    class: 'porous_separator'
+    thickness: 20e-6  # separator thickness, m
+    n_points: 4       # Number of finite volumes to discretize
     electrolyte-phase: 'electrolyte' # Cantera phase name
     sigma_io: 1.3 # S/m DOI:10.1149/2.0571912jes for 1M LiPF6 in EC:EMC (3:7 w:w) at 50 deg C
+    transport:
+      mobile-ion:  'Li+(e)' # Species name for Li+ in elyte.
+      model: 'dilute-solution'
+      diffusion-coefficients: # Species names must match those in the phase 
+      #definition, below:
+        - species: 'TEGDME(e)'
+          D_k: 1e-15
+        - species: 'Li+(e)' 
+          D_k: 1e-15
+        - species: 'TFSI-(e)'
+          D_k: 2e-11
+        - species: 'S8(e)'
+          D_k: 2e-13
+        - species: 'S8-(e)'
+          D_k: 2e-13
+        - species: 'S6-(e)'
+          D_k: 2e-13
+        - species: 'S4-(e)'
+          D_k: 2e-13
+        - species: 'S2-(e)'
+          D_k: 2e-13
+        - species: 'S-(e)'
+          D_k: 2e-13
     phi_0: 0.08 # Initial electric potential, V
     eps_electrolyte: 0.65 # Electrolyte volume fraction, -
   cathode:
@@ -72,18 +96,18 @@ parameters:
     type: 'potential_hold' # Constant current cycling
     steps: #Sequence of potential holds
     - potential: 3.25 # V, cell potential for the hold.
-      time: 1e2 # s, time for the hold.
-    - potential: 3.05 # V, cell potential for the hold.
-      time: 1200 # s, time for the hold.
+      time: 1 # s, time for the hold.
+    # - potential: 3.05 # V, cell potential for the hold.
+    #   time: 1 # s, time for the hold.
     # - potential: 2.75 # V, cell potential for the hold.
-    #   time: 100 # s, time for the hold.
+    #   time: 10 # s, time for the hold.
     # - potential: 2.25 # V, cell potential for the hold.
-    #   time: 2400 # s, time for the hold.
+    #   time: 150 # s, time for the hold.
     # - potential: 1.75 # V, cell potential for the hold.
     #   time: 3600 # s, time for the hold.
     equilibrate: 
       enable: True # Begin with a hold at i_ext = 0?
-      time: 100 # If true, how long is the hold, s
+      time: 5 # If true, how long is the hold, s
     species-cutoff: 1e-12 # Simulation cuts off if C_k <= this value
 
 # Cantera inputs:
@@ -339,27 +363,27 @@ lithium_electrolyte-reactions:
 carbon-elyte-reactions:
 - equation: 0.5 S8(e) + electron <=> 0.5 S8-(e)
   id: sulfur_reduction_1
-  rate-constant: {A: 7.725e4, b: 0.0, Ea: 0.0} #7.725e5
+  rate-constant: {A: 7.725e5, b: 0.0, Ea: 0.0} 
   beta: 0.5
 
 - equation: 1.5 S8-(e) + electron <=> 2 S6-(e)
   id: sulfur_reduction_2
-  rate-constant: {A: 4.331e1, b: 0.0, Ea: 0.0} #4.331e16
+  rate-constant: {A: 4.331e+5, b: 0.0, Ea: 0.0} #4.331e16
   beta: 0.5
 
 - equation: S6-(e) + electron <=> 1.5 S4-(e)
   id: sulfur_reduction_3
-  rate-constant: {A: 3.193e-3, b: 0.0, Ea: 0.0} #3.19e14
+  rate-constant: {A: 3.193e+5, b: 0.0, Ea: 0.0} #3.19e14
   beta: 0.5
 
 - equation: 0.5 S4-(e) + electron <=> S2-(e)
   id: sulfur_reduction_4
-  rate-constant: {A: 2.375e-4, b: 0.0, Ea: 0.0} #2.375e11
+  rate-constant: {A: 2.375e+2, b: 0.0, Ea: 0.0} #2.375e11
   beta: 0.5
 
 - equation: 0.5 S2-(e) + electron <=> S-(e)
   id: sulfur_reduction_4
-  rate-constant: {A: 4.655e-11, b: 0.0, Ea: 0.0}
+  rate-constant: {A: 4.655e+1, b: 0.0, Ea: 0.0} #e11
   beta: 0.5
   
 sulfur-elyte-reactions:
@@ -370,4 +394,4 @@ sulfur-elyte-reactions:
 lithium-sulfide-elyte-reactions:
 - equation: 2 Li+(e) + S-(e) <=> Li2S(s)
   id: sulfur_reduction_6
-  rate-constant: {A: 1.07, b: 0.0, Ea: 0.0} #1.075, b: 0.0, Ea: 0.0}
+  rate-constant: {A: 1.075e+2, b: 0.0, Ea: 0.0} #1.075e7, b: 0.0, Ea: 0.0}

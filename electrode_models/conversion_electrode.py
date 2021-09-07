@@ -34,12 +34,14 @@ class electrode():
         self.conversion_obj = []
         self.conversion_surf_obj = []
         self.n_conversion_phases = 0
+        self.conversion_phase_min = []
         for ph in inputs["conversion-phases"]:
             self.conversion_phases.append(ph["bulk-name"])
             self.conversion_obj.append(ct.Solution(input_file, ph["bulk-name"]))
             self.conversion_surf_obj.append(ct.Interface(input_file, 
                 ph["surf-name"],[self.elyte_obj, self.host_obj, 
                 self.conversion_obj[self.n_conversion_phases]]))
+            self.conversion_phase_min.append(ph["min-vol-frac"])
             self.n_conversion_phases += 1
 
         # Anode or cathode? Positive external current delivers positive charge 
@@ -235,12 +237,16 @@ class electrode():
             # dphi_dl) produces the correct ionic current between the separator # and cathode:
             if params['boundary'] == 'current':
                 resid[SVptr['phi_ed']] = i_io - params['i_ext']
+
             elif params['boundary'] == 'potential':   
                 # Potential at time t:
                 phi = np.interp(t, params['times'], params['potentials'])
                    
                 # Cell potential must equal phi:
                 resid[SVptr['phi_ed']] = SV_loc[SVptr['phi_ed']] - phi
+
+        # Placeholder for Area
+        A_int = self.A_surf_ratio*self.dyInv
 
         # Double layer current has the same sign as i_Far, and is based on 
         # charge balance in the electrolyte phase:
@@ -252,13 +258,42 @@ class electrode():
 
         # Molar production rate of electrolyte species (kmol/m2/s), due to 
         # reactions at the host surface and for each conversion phase surface:
-        sdot_elyte = self.host_surf_obj.get_net_production_rates(self.elyte_obj)
+        sdot_elyte = \
+            self.host_surf_obj.get_net_production_rates(self.elyte_obj) * A_int
+        # print('carbon ', self.host_surf_obj.forward_rate_constants, self.host_surf_obj.reverse_rate_constants)
         for j, ph in enumerate(self.conversion_surf_obj):
-            
-            #TODO: Need a tanh function to scale these reactions when the phase disappears.
+            # We scale the phase destruction rates by a multiplier than goes to 
+            # zero as the phase volume fraction goes below a user-specified 
+            # minimum:
+            eps_ph = SV_loc[SVptr['eps_conversion'][0,j]]
+            mult = tanh(eps_ph / self.conversion_phase_min[j])
 
-            # sdot_elyte += ph.get_net_production_rates(self.elyte_obj)
+            # Surface area per unit volume:
+            # A_ph  = (self.A_conversion_surf_0[j] 
+            #     * (eps_ph / self.eps_conversion_0[j])**1.5)
+
+            if j:
+                sdot_ph = (ph.get_destruction_rates(self.conversion_obj[j])
+                    - mult * ph.get_creation_rates(self.conversion_obj[j]))
+            else:
+                sdot_ph = (ph.get_creation_rates(self.conversion_obj[j]) 
+                    - mult *  ph.get_destruction_rates(self.conversion_obj[j]))
+
+            d_eps_dt = np.dot(sdot_ph, 
+                self.conversion_obj[j].partial_molar_volumes) * A_int
+
+            resid[SVptr['eps_conversion'][0,j]] = \
+                SVdot_loc[SVptr['eps_conversion'][0,j]] - d_eps_dt
+            # print(self.conversion_phases[j], ph.delta_gibbs, ph.delta_standard_gibbs, ph.forward_rate_constants, ph.reverse_rate_constants, ph.equilibrium_constants)
+            # print(self.conversion_phases[j], mult, ph.get_creation_rates(self.conversion_obj[j]), ph.get_destruction_rates(self.conversion_obj[j]), ph.get_net_production_rates(self.conversion_obj[j]), d_eps_dt)
+            #TODO: Need a tanh function to scale these reactions when the phase disappears.
+            sdot_elyte_ph = (mult *  ph.get_creation_rates(self.elyte_obj) 
+                - ph.get_destruction_rates(self.elyte_obj)) 
+
+            sdot_elyte += sdot_elyte_ph 
         
+
+        # sdflkjh
         # Double layer current removes Li from the electrolyte.  Subtract this 
         # from sdot_electrolyte:
         sdot_elyte[self.index_Li] -= i_dl / ct.faraday
@@ -299,5 +334,15 @@ class electrode():
         # axs[ax_offset].plot(solution[0,:]/3600, C_k_an)
         # axs[ax_offset].set_ylabel(self.name+' Li \n(kmol/m$^3$)')
         # axs[ax_offset].set(xlabel='Time (h)')
+        for j, ph in enumerate(self.conversion_phases):
+            ptr_eps = 2 + self.SV_offset + self.SVptr['eps_conversion'][0,j]
+            eps_ph = solution[ptr_eps, :]
+            axs[ax_offset].plot(solution[0,:]/3600, eps_ph)
 
+        ax_offset += 1
+        for j in np.arange(self.elyte_obj.n_species):
+            ptr_species = 2 + self.SV_offset + self.SVptr['C_k_elyte'][0,j]
+            axs[ax_offset].plot(solution[0,:]/3600, solution[ptr_species, :])
+
+        axs[ax_offset].legend(self.elyte_obj.species_names)
         return axs

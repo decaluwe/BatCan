@@ -34,7 +34,7 @@ def run(SV_0, an, sep, ca, algvars, params):
         return_val[1] = 1.0
 
     # Set up the differential algebraic equation (dae) solver:
-    options =  {'user_data':(an, sep, ca, params), 'rtol':1e-8, 'atol':1e-11, 
+    options =  {'user_data':(an, sep, ca, params), 'rtol':1e-4, 'atol':1e-7, 
             'algebraic_vars_idx':algvars, 'first_step_size':1e-18, 
             'rootfn':terminate_check, 'nr_rootfns':2, 'compute_initcond':'yp0'}
     solver = dae('ida', residual, **options)

@@ -270,7 +270,7 @@ class electrode():
         return sep
 
     def output(self, axs, solution, ax_offset):
-
+        # Plot electrode thickness:
         axs[ax_offset].plot(solution[0,:]/3600, 
             1e6*solution[2+int(self.SVptr['thickness'])])
         axs[ax_offset].set_ylabel(self.name+' Thickness \n($\mu$m)')
