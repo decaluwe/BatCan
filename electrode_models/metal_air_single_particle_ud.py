@@ -210,7 +210,7 @@ class electrode():
         resid[SVptr['phi_dl']] = \
             SVdot_loc[SVptr['phi_dl']] - i_dl*self.C_dl_Inv
 
-        # Molar production rate of electrode species (kmol/m2/s). Should be seperate on the discretization.
+        # Molar production rate of electrode species (kmol/m_tot^2/s). Should be seperate on the discretization.
         sdot_elyte_c = self.surf_obj.get_net_production_rates(self.elyte_obj) 
         sdot_elyte_o = self.air_elyte_obj.get_net_production_rates(self.elyte_obj)
         
@@ -221,7 +221,8 @@ class electrode():
         # Change in electrolyte species concentration per unit time:
         dCk_elyte_dt = \
             ((sdot_elyte_c * A_surf_ratio + sdot_elyte_o + self.i_ext_flag * N_k_sep) 
-            * self.dyInv / eps_elyte) # first term is reaction second term is seperater? 
+            * self.dyInv / eps_elyte) # first term is reaction second term is seperater?
+        
         resid[SVptr['C_k_elyte']] = SVdot_loc[SVptr['C_k_elyte']] - dCk_elyte_dt
         #molar production rate of 
         sdot_cath = self.surf_obj.get_net_production_rates(self.product_obj)
@@ -229,6 +230,7 @@ class electrode():
         
         dEpsOxide_dt =  A_avail * np.dot(sdot_cath, self.product_obj.partial_molar_volumes) 
         resid[SVptr['eps_oxide']] = (SVdot_loc[SVptr['eps_oxide']] - dEpsOxide_dt)
+        print(resid)
 
         return resid
         
