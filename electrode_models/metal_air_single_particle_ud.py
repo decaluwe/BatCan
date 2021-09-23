@@ -177,6 +177,7 @@ class electrode():
         self.elyte_obj.X = ck_elyte
 
         sdot_electron = self.surf_obj.get_net_production_rates(self.host_obj) #kmol m-2 s-2
+        print(sdot_electron)
         
         # Faradaic current density is positive when electrons are consumed 
         # (Li transferred to the electrode)
@@ -222,7 +223,7 @@ class electrode():
         dCk_elyte_dt = \
             ((sdot_elyte_c * A_surf_ratio + sdot_elyte_o + self.i_ext_flag * N_k_sep) 
             * self.dyInv / eps_elyte) # first term is reaction second term is seperater?
-        
+
         resid[SVptr['C_k_elyte']] = SVdot_loc[SVptr['C_k_elyte']] - dCk_elyte_dt
         #molar production rate of 
         sdot_cath = self.surf_obj.get_net_production_rates(self.product_obj)
