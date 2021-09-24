@@ -20,7 +20,7 @@ cell-description:
     minimum-thickness: 1e-9 # minimum anode thickness. 
     phi_0: 0. # Initial electric potential, V
     A_surf_ratio: 1.0 # Interface area per unit geometric area
-    C_dl: 6e-3 #F/m2
+    C_dl: 6e-5 #F/m2
     dy_elyte: 2e-6
   separator:
     class: 'porous_separator'
@@ -46,8 +46,8 @@ cell-description:
         - species: 'LiO2[elyt]'
           D_k: 2e-13 # can't find (assume low?)
   cathode:
-    class: 'metal_air_HNG_2'
-    n-points: 10
+    class: 'metal_air_HNG'
+    n-points: 1
     gas-phase: 'oxygen'
     elyte-iphase: 'air-elyte-interface'
     electrolyte-phase: 'electrolyte' # Cantera phase name
@@ -60,12 +60,12 @@ cell-description:
     r_host: 6e-6 # Carbon Particle radius, m
     d_oxide: 1.5e-6 #Oxide diameter, m
     th_oxide: 850e-9 #oxide thickness, m
-    phi_0: 2.95 # Initial electric potential, V
+    phi_0: 2.05 # Initial electric potential, V
     eps_host: 0.65 # Solid phase volume fraction of carbon -
     eps_oxide: 0.00 # solid phase volume fraction of Li2O2 -
     C_dl: 6e-3 #F/m2 Question: should I change this??
-    Minrad: 1e-20 #m
-    Maxrad: 1e-4 #m
+    r_min: 1e-20 #m
+    r_max: 1e-4 #m
     buckets: 10 #number
     C_Li_Sat: 1.1 #mol/m3
     C_LiO2_Sat: 1.1 #mol/m3
@@ -79,6 +79,11 @@ cell-description:
       name: Li2O2[cathode]
       charge: 2
       MW: 45.881
+    plot-species: # any extra species in the electrolyte that you want to plot.
+      - name: 'O2(e)'
+      - name: 'LiO2[elyt]'
+      - name: 'Li+[elyt]'
+      # - name: 'TFSI-[elyt]'
 
 
 # Simulation parameters:
@@ -90,15 +95,15 @@ parameters:
     type: 'CC_cycle' # Constant current cycling
     # Specify only one of i_ext or C-rate. The other should be null:
     i_ext: null #0.01 A/cm2 # input current density, format: XX units. Units are 'current/area', with no carat for exponents (e.g. A/cm2)
-    C-rate: 0.1 # input C-rate
-    n_cycles: 2 # Number of cycles. Currently must be 0.5 or an int.
+    C-rate: 0.0001 # input C-rate
+    n_cycles: 0.5 # Number of cycles. Currently must be 0.5 or an int.
     first-step: 'discharge'  # Start with charge or discharge?
-    phi-cutoff-lower: 1.8 # Simulation cuts off if E_Cell <= this value
+    phi-cutoff-lower: 1.5 # Simulation cuts off if E_Cell <= this value
     phi-cutoff-upper: 4.8 # Simulation cuts off if E_Cell >= this value
     species-cutoff: 1e-12 # Simulation cuts off if C_k <= this value
     equilibrate: 
       enable: True # Start with a hold at open circuit?
-      time: 100 # If true, how long is the hold, s
+      time: 10 # If true, how long is the hold, s
 
 # Cantera inputs:
 description: |-
@@ -167,7 +172,7 @@ phases:
   elements: [Li, F, N, S, C, H, O, E]
   species: ['C10H22O5[elyt]', 'Li+[elyt]', 'TFSI-[elyt]', 'O2(e)', 'LiO2[elyt]', 'Li2O2[cathode]']
   state:
-    X: {'C10H22O5[elyt]': 0.85464, 'Li+[elyt]': 0.14536, 'TFSI-[elyt]': 0.14536, 'O2(e)': 1E-9, 'LiO2[elyt]': 1E-9} 
+    X: {'C10H22O5[elyt]': 0.85464, 'Li+[elyt]': 0.14536, 'TFSI-[elyt]': 0.14536, 'O2(e)': 1.45E-4, 'LiO2[elyt]': 3.0E-5} 
   standard-concentration-basis: unity
 
 - name: air-elyte-interface
@@ -295,7 +300,7 @@ species:
   composition: {Li: 1, O: 2}
   thermo:
     model: constant-cp
-    h0: 0.0 J/mol # Question: should I put this here https
+    h0: -360.0 kJ/mol # Question: should I put this here https
     s0: 0.0 J/mol/K 
   equation-of-state:
     model: constant-volume
@@ -375,13 +380,13 @@ species:
 lithium_electrolyte-reactions:
 - equation: Li[metal] <=> Li+[elyt] + electron
   id: lithium_faradaic_reaction
-  rate-constant: {A: 6.0e+09, b: 0.0, Ea: 0.0}
+  rate-constant: {A: 6.0e+13, b: 0.0, Ea: 0.0}
   beta: 0.5
 
 cathode-surf-reactions:
 - equation:  Li+[elyt] + O2(e) + 1 electron <=> LiO2[elyt]  # Reaction 1
   id: cathode_reaction
-  rate-constant: {A: 3E-10, b: 0.0, Ea: 58.0 kJ/mol} #need a new reaction rate
+  rate-constant: {A: 3.0E-01, b: 0.0, Ea: 58.0 kJ/mol} #need a new reaction rate
   exchange-current-density-formulation: true
   beta: 0.5
 
@@ -404,5 +409,6 @@ air-electrolyte-reactions:
 #Yin, Y.; et al., J. Phys. Chem. C, vol. 121, no. 36, pp. 19577–19585, 2017, doi: 10.1021/acs.jpcc.7b05224.
 
 #Official Soundtrack:
+  #St. Vincent - Masseduction
   #Day 6 - as of 2021 all albums/songs 
   #      - highlight Finale, Congradulations, 예뻤어
