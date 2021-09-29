@@ -93,9 +93,9 @@ class electrode():
 
     def residual(self, t, SV, SVdot, sep, counter, params):
         """
-        Define the residual for the state of the dense self.
+        Define the residual for the state of the dense electrode.
 
-        This is an array of differential and algebraic governing equations, one for each state variable in the anode (anode plus a thin layer of electrolyte + separator).
+        This is an array of differential and algebraic governing equations, one for each state variable in the electrode (electrode plus a thin layer of electrolyte + separator).
 
         1. The electric potential is an algebraic variable.
             In the anode, phi = 0 is the reference potential for the system.
@@ -263,19 +263,34 @@ class electrode():
         """
         The electrode domain considers the electrode object plus a thin layer of the separator, adjacent to the self. We subtract this thickness from the total separator thickness, so that we do not inadvertently increase the total transport resistance through the separator.
         """
-        sep.dy -= self.dy_elyte
-        
+        # New separator thickness:
+        thickness = sep.dy*sep.n_points - self.dy_elyte        
+
         # Reduce the number of points in the separator by one, unless the 
         # separator already only contains one point (which is the case for the 
-        # `ionic_resistor` model. In this case, leave sep.n_points at 1.)
-        sep.n_points = max(sep.n_points - 1, 1)
+        # `ionic_resistor` model), or if the thickness of elyte removed from 
+        # the separator as less than half the thickness of a single discretized 
+        # volume.  In tnis case, leave sep.npoints as is.
+        if sep.n_points > 1 and self.dy_elyte >= 0.5*sep.dy:
+            sep.n_points -= 1
+        
+        sep.dy = thickness / sep.n_points
+        sep.dyInv = 1. / sep.dy
         
         return sep
 
-    def output(self, axs, solution, SV_offset, ax_offset):
+    def elyte_potential(self, SV, j):
+        phi_ed = SV[self.SVptr['electrode'][self.SVptr['phi_ed'][j]]]
+        phi_dl = SV[self.SVptr['electrode'][self.SVptr['phi_dl'][j]]]
+
+        phi_elyte = phi_ed + phi_dl
+
+        return phi_elyte
+
+    def output(self, axs, solution, ax_offset):
 
         axs[ax_offset].plot(solution[0,:]/3600, 
-            1e6*solution[SV_offset+int(self.SVptr['thickness'])])
-        axs[ax_offset].set_ylabel(self.name+' Thickness \n($\mu$m)')
+            1e6*solution[2+int(self.SVptr['thickness'])])
+        axs[ax_offset].set_ylabel(self.name+' thickness \n($\mu$m)')
 
         return axs

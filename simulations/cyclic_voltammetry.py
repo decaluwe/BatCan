@@ -24,10 +24,10 @@ def run(SV_0, an, sep, ca, algvars, params):
     """ 
     Run the simulation
     """
-
+    
     # Store the location of all algebraic variables.
     params['algvars'] = algvars
-
+    
     # Initialize the vector of state vector time derivative (dSV/dt):
     SVdot_0 = np.zeros_like(SV_0)
     

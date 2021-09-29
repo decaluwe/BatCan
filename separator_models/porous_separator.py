@@ -84,7 +84,7 @@ class separator():
         
         # Save indices for any algebraic variables.
         self.algvars = self.SV_offset + self.SVptr['phi']
-
+        
         # Load intial state variables:
         SV[self.SVptr['phi']] = inputs['phi_0']
         for i in range(self.n_points):
@@ -129,9 +129,6 @@ class separator():
         N_k_elyte_in, i_io_in = self.electrode_boundary_flux(SV, an, 
             params['T'])
         
-        # The ionic current must equal the external current.
-        # resid[self.SVptr['phi'][0]] = i_io - params['i_ext']
-        
         # Repeat this for the electric potential in the other separator nodes:
         for j in np.arange(self.n_points-1):
             # Calculate the electrolyte species fluxes and the corresponding 
@@ -158,7 +155,6 @@ class separator():
 
         # The ionic current must equal the external current.
         resid[self.SVptr['phi'][j]] = i_io_in - i_io_out
-        
         return resid
 
     def electrode_boundary_flux(self, SV, ed, T):
@@ -188,9 +184,7 @@ class separator():
         phi_1 = SV[self.SVptr['sep'][self.SVptr['phi'][j_elyte]]]
 
         # Elyte electric potential in electrode:
-        phi_ed = SV[ed.SVptr['electrode'][ed.SVptr['phi_ed'][j_ed]]]
-        phi_dl = SV[ed.SVptr['electrode'][ed.SVptr['phi_dl'][j_ed]]]
-        phi_2 = phi_ed + phi_dl
+        phi_2 = ed.elyte_potential(SV, j_ed)
         
         C_k_1 = SV[self.SVptr['sep'][self.SVptr['C_k_elyte'][j_elyte]]]
         C_k_2 = SV[ed.SVptr['electrode'][ed.SVptr['C_k_elyte'][j_ed]]]
@@ -201,7 +195,8 @@ class separator():
         state_2 = {'C_k': C_k_2, 'phi':phi_2, 'T':T, 'dy':ed.dy_elyte, 
             'microstructure':ed.elyte_microstructure}
 
-        # Multiply by ed.i_ext_flag: fluxes are out of the anode, into the cathode.
+        # Multiply by ed.i_ext_flag: fluxes are out of the anode, into the 
+        # cathode. 
         N_k_elyte, i_io = tuple(x*ed.i_ext_flag 
             for x in self.elyte_transport(state_1, state_2, self))
 
@@ -251,8 +246,14 @@ class separator():
             axs[ax_offset].plot(solution[0,:]/3600, 
                 solution[phi_elyte_ptr[j],:])
         
+<<<<<<< HEAD
         phi_ca = \
             (solution[ca.SVptr['electrode'][ca.SVptr['phi_ed'][0]]+SV_offset,:] + solution[ca.SVptr['electrode'][ca.SVptr['phi_dl'][0]]+SV_offset,:])
+=======
+        phi_ca = ca.elyte_potential(solution[2:],0)
+        # (solution[ca.SVptr['electrode'][ca.SVptr['phi_ed'][0]]+2,:] 
+        #     + solution[ca.SVptr['electrode'][ca.SVptr['phi_dl'][0]]+2,:])
+>>>>>>> 91c3fae52 (Initial commit of nonintercalating_interphase)
         axs[ax_offset].plot(solution[0,:]/3600, phi_ca)
         axs[ax_offset].set_ylabel('Separator Potential \n(V)')
         

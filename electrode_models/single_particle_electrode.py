@@ -243,6 +243,15 @@ class electrode():
         resid[SVptr['C_k_elyte']] = SVdot_loc[SVptr['C_k_elyte']] - dCk_elyte_dt
 
         return resid
+
+    def elyte_potential(self, SV, j):
+        
+        phi_ed = SV[self.SVptr['electrode'][self.SVptr['phi_ed'][j]]]
+        phi_dl = SV[self.SVptr['electrode'][self.SVptr['phi_dl'][j]]]
+
+        phi_elyte = phi_ed + phi_dl
+
+        return phi_elyte
         
     def voltage_lim(self, SV, val):
         """

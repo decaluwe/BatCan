@@ -14,7 +14,7 @@ class separator():
         self.n_vars = 1
     
         self.dy = inputs['thickness']
-        self.dyInv = 1/self.dy
+        self.dyInv = 1. / self.dy
         self.eps_elyte = inputs['eps_electrolyte']
 
         # Microstructure-based transport scaling factor, based on Bruggeman 
