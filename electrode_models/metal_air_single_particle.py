@@ -281,14 +281,9 @@ class electrode():
         
         # print(sdot_product, sdot_elyte_host)
         resid[SVptr['C_k_elyte']] = (SVdot_loc[SVptr['C_k_elyte']] 
-<<<<<<< HEAD
-            - (N_k_sep + sdot_elyte_air + sdot_elyte_host * A_surf_ratio) 
-            * self.dyInv)
-=======
             - (self.i_ext_flag*N_k_sep + sdot_elyte_air 
             + sdot_elyte_host * A_surf_ratio) * self.dyInv)
             
->>>>>>> 2de144626 (Metal-air with HNG kinetics.)
         return resid
         
     def voltage_lim(self, SV, val):
