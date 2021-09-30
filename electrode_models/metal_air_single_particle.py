@@ -235,9 +235,9 @@ class electrode():
         if self.geometry == 'rectangle':
             A_avail = self.A_init - eps_product/self.th_oxide
         elif self.geometry == 'hemisphere':
-            A_avail = self.A_init - 3./4.*eps_product/self.r_oxide
-        elif self.geometry == 'torid':
-            A_avail = self.A_init - eps_product/self.r_oxide/np.pi
+            A_avail = self.A_init - 3./2.*eps_product/self.r_oxide
+        elif self.geometry == 'toroid':
+            A_avail = self.A_init - 2*eps_product/self.r_oxide/np.pi
         
         # Convert to m2 interface per m2 geometric area:
         A_surf_ratio = A_avail*self.dy

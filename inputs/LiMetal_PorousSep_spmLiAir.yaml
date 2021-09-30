@@ -67,7 +67,7 @@ cell-description:
     eps_host: 0.65 # Solid phase volume fraction of carbon -
     eps_product: 0.00 # solid phase volume fraction of Li2O2 -
     C_dl: 6e-4 #F/m2
-    geometry: 'torid' #specify either: rectangle, hemisphere or torid
+    geometry: 'toroid' #specify either: rectangle, hemisphere or toroid
     stored-species: # Details on the stored species. Used for capacity calc.
       name: Li2O2[cathode]
       charge: 2
