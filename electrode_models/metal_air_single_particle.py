@@ -55,13 +55,18 @@ class electrode():
         # This calculation assumes spherical particles of a single radius, with 
         # no overlap.
         # Electrode-electrolyte interface area, per unit geometric area.
+        self.geometry = inputs['geometry']
         self.r_host = inputs['r_host']
         self.th_oxide = inputs['th_oxide']
+        self.particle_an= inputs['particle_an']
+        self.particle_int = inputs['particle_int']
+        self.r_oxide = inputs['r_oxide']
+        self.r_oxint = inputs['r_ox_int']
         self.V_host = 4./3. * np.pi * (self.r_host / 2)**3  # carbon or host volume [m3]
         self.A_host = 4. * np.pi * (self.r_host / 2)**2    # carbon or host surface area [m2]
         self.A_init = self.eps_host * self.A_host / self.V_host  # m2 of interface / m3 of total volume [m-1]
-        self.A_oxide = np.pi* inputs['d_oxide']**2/4.   # oxide area
-        self.V_oxide = 2./3. * np.pi* (inputs['d_oxide']/2.)**2 * self.th_oxide #oxide volume
+        self.A_oxide = np.pi* self.r_oxide**2/4.   # oxide area
+        self.V_oxide = 2./3. * np.pi* (self.r_oxide/2.)**2 * self.th_oxide #oxide volume
 
         # For some models, the elyte thickness is different from that of the 
         # electrode, so we specify is separately:
@@ -115,7 +120,10 @@ class electrode():
         self.SVptr = {}
         self.SVptr['phi_ed'] = np.arange(0, self.n_vars_tot, self.n_vars)
         self.SVptr['phi_dl'] = np.arange(1, self.n_vars_tot, self.n_vars)
+        # if self.particle_an == 'no': 
         self.SVptr['eps_product'] = np.arange(2, self.n_vars_tot, self.n_vars)
+        # elif self.particle_an == 'yes':
+        #     self.SVptr['radius'] = np.arange(2, self.n_vars_tot, self.n_vars)
         self.SVptr['C_k_elyte'] = np.ndarray(shape=(self.N_y, 
             self.elyte_obj.n_species), dtype='int')       
         for i in range(self.N_y):
@@ -137,7 +145,10 @@ class electrode():
         # Load intial state variables: Change it later
         SV[self.SVptr['phi_ed']] = inputs['phi_0']
         SV[self.SVptr['phi_dl']] = sep_inputs['phi_0'] - inputs['phi_0']
+        # if self.particle_an == 'no':
         SV[self.SVptr['eps_product']] = self.eps_product_init
+        # if self.particle_an == 'yes':
+        #     SV[self.SVptr['radius']] = self.r_oxint
         SV[self.SVptr['C_k_elyte']] = self.elyte_obj.concentrations
         
         return SV
@@ -184,7 +195,12 @@ class electrode():
         phi_elyte = phi_ed + SV_loc[SVptr['phi_dl']]
         # print('phi_elyte = ', phi_elyte)
         c_k_elyte = SV_loc[SVptr['C_k_elyte']]
+        # if self.particle_an == 'no':
         eps_product = SV_loc[SVptr['eps_product']]
+        # elif self.particle_an == 'yes':
+        #     radius = SV_loc[SVptr['radius']]
+        #     eps_product = self.eps_product_init + self.particle_int*2./3.*radius**3*np.pi/self.dyInv
+           
         
         # Set Cantera object properties:
         self.host_obj.electric_potential = phi_ed
@@ -214,9 +230,15 @@ class electrode():
             elif params['boundary'] == 'potential':                  
                 resid[SVptr['phi_ed']] = (SV_loc[SVptr['phi_ed']] 
                     - params['potential']) 
-        
+
         # Calculate available surface area (m2 interface per m3 electrode):
-        A_avail = self.A_init - eps_product/self.th_oxide
+        if self.geometry == 'rectangle':
+            A_avail = self.A_init - eps_product/self.th_oxide
+        elif self.geometry == 'hemisphere':
+            A_avail = self.A_init - 3./4.*eps_product/self.r_oxide
+        elif self.geometry == 'torid':
+            A_avail = self.A_init - eps_product/self.r_oxide/np.pi
+        
         # Convert to m2 interface per m2 geometric area:
         A_surf_ratio = A_avail*self.dy
 
@@ -233,10 +255,13 @@ class electrode():
         # Chemical production rate of the product phase: (mol/m2 interface/s)
         sdot_product = (self.surf_obj.get_creation_rates(self.product_obj)
             - mult * self.surf_obj.get_destruction_rates(self.product_obj))
-      
-        # Rate of change of the product phase volume fraction:
+        # if self.particle_an == 'no':
         resid[SVptr['eps_product']] = (SVdot_loc[SVptr['eps_product']] 
             - A_avail * np.dot(sdot_product, self.product_obj.partial_molar_volumes))
+        # elif self.particle_an == 'yes':
+        #     resid[SVptr['radius']] = (3*np.dot(sdot_product, self.product_obj.partial_molar_volumes)/(self.particle_int*np.pi*2.))**(1./3.)
+        # Rate of change of the product phase volume fraction:
+        
 
         # Production rate of the electron (moles / m2 interface / s)
         sdot_electron = (mult * self.surf_obj.get_creation_rates(self.host_obj)
@@ -258,7 +283,6 @@ class electrode():
         resid[SVptr['C_k_elyte']] = (SVdot_loc[SVptr['C_k_elyte']] 
             - (N_k_sep + sdot_elyte_air + sdot_elyte_host * A_surf_ratio) 
             * self.dyInv)
-            
         return resid
         
     def voltage_lim(self, SV, val):

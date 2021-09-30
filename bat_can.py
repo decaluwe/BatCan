@@ -8,6 +8,7 @@
 # Import modules
 import importlib # allows us to import from user input string.
 import numpy as np
+from datetime import datetime
 
 from bat_can_init import initialize
 
@@ -82,6 +83,10 @@ def bat_can(input = None):
     #   CREATE FIGURES AND SAVE ALL OUTPUTS
     #===========================================================================
     # Call any output routines related to the simulation type:
+    dt = datetime.now()
+    dt_string = dt.strftime("%d%m%Y_%H%M")
+    save_name = 'C:/Users/Mels/Code/BatCan/outputs' +input+'_'+dt_string
+    np.savetxt(save_name+".csv", solution, delimiter=",")
     model.output(solution, an, sep, ca, parameters)
 
 
