@@ -14,15 +14,16 @@ from bat_can_init import initialize
 
 # This is the main function that runs the model.  We define it this way so it 
 # is called by "main," below:
-def bat_can(input = None):
-    if input is None:
+def bat_can(inputfile = None):
+    if inputfile is None:
         # Default is a single-particle model of graphite/LCO
         input = 'inputs/spmGraphite_PorousSep_spmLCO_input.yaml'
     else:
-        if input[-5:] == '.yaml':
-            input  = 'inputs/'+input
+        if inputfile[-5:] == '.yaml':
+            input  = 'inputs/'+inputfile
+            inputfile = inputfile[:-5]
         else:
-            input = 'inputs/'+input+'.yaml'
+            input = 'inputs/'+inputfile+'.yaml'
 
     #===========================================================================
     #   READ IN USER INPUTS
@@ -78,6 +79,13 @@ def bat_can(input = None):
             package='simulations')
 
     solution = model.run(SV_0, an, sep, ca, algvars, parameters)
+    
+    dt = datetime.now()
+ 
+    dt_string = dt.strftime("%d%m%Y_%H%M")
+    parameters['save_name'] = ('outputs/'+inputfile+'_'+parameters['savename']
+        +'_'+ dt_string)
+    np.savetxt(parameters['save_name']+".csv", solution, delimiter=",")
 
     #===========================================================================
     #   CREATE FIGURES AND SAVE ALL OUTPUTS

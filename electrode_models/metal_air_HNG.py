@@ -58,14 +58,14 @@ class electrode():
         # # Electrode-electrolyte interface area, per unit geometric area.
         self.r_host = inputs['r_host']
         # self.th_oxide = inputs['th_oxide']
-        self.V_host = 4./3. * np.pi * (self.r_host / 2.)**3  # carbon or host volume [m3]
+        self.V_host = 4./3. * m.pi * (self.r_host / 2.)**3  # carbon or host volume [m3]
         self.A_host = 4. * np.pi * (self.r_host / 2.)**2    # carbon or host surface area [m2]
         self.A_init = self.eps_host * self.A_host / self.V_host  # m2 of interface / m3 of total volume [m-1]
         
         # inputs for nucleation:
-        self.c_li_sat = inputs['C_Li_Sat']
-        self.c_liO2_sat = inputs['C_LiO2_Sat']
-        self.gamma_surf = 1000*inputs['Gamma_surf'] # convert to per kmol
+        self.c_li_sat = inputs['C_Li_Sat'] / 1000. #convert to kmol
+        self.c_liO2_sat = inputs['C_LiO2_Sat'] / 1000. #convert to kmol
+        self.gamma_surf = inputs['Gamma_surf']
         self.k_surf = inputs['k_surf']
         self.k_surf_des = inputs['k_surf_des']
         self.phi = (2. + m.cos(inputs['contact-angle']))*(1.- m.cos( inputs['contact-angle']))**2./4.
@@ -178,11 +178,12 @@ class electrode():
 
         # Read the electrode and electrolyte electric potential:
         phi_ed = SV_loc[SVptr['phi_ed']]
-        phi_elyte = phi_ed + SV_loc[SVptr['phi_dl']]      
+        phi_dl = SV_loc[SVptr['phi_dl']]
+        phi_elyte = phi_ed + phi_dl
         
         # Initialize vectors for rate of change for radius and number of 
         # particles in each histogram bin:
-        Dr_dt = np.zeros_like(SV[SVptr['product']])
+        dNdt_radii = np.zeros_like(SV[SVptr['product']])
         dNp_dt = np.zeros_like(SV[SVptr['product']])
 
         # Store a local copy of RT
@@ -233,41 +234,57 @@ class electrode():
         # Double layer current has the same sign as i_Far, and is based on 
         # charge balance in the electrolyte phase:
         # m2 interface/ m3 total volume [m-1]
-        A_avail = self.A_init - np.sum(N_p*self.r_p**2*m.pi)*self.dyInv
+        A_avail = self.A_init - np.sum(N_p*self.r_p**2)*self.dyInv*m.pi
         A_surf_ratio = A_avail*self.dy # m2 interface / m2 total area [-]
         
         #preliminary 
         V = self.product_obj.partial_molar_volumes[0] #m^3 kmol-1 
         a_d = (ck_elyte[self.index_LiO2]*ct.avogadro)**(-1./3.) # length scale of diffusion (m)
         # Net saturation parameter:
-        S = (ck_elyte[self.index_LiO2]/self.c_liO2_sat
-            * ck_elyte[self.index_Li]/self.c_li_sat)
+        # c_Li_dl = (SV_loc[self.SVptr['phi_dl']] * ct.faraday * A_avail 
+        #     / self.C_dl_Inv)
+        # c_Li_elyte = ck_elyte[self.index_Li]*eps_elyte
+        # c_Li = 0.5 * (c_Li_dl + c_Li_elyte) * eps_elyte
+        S = (ck_elyte[self.index_LiO2]/self.c_liO2_sat)
+        # * c_Li/self.c_li_sat)
+        # print('t = ', t)
+        # print(self.gamma_surf)
+        # S = (ck_elyte[self.index_LiO2]/self.c_liO2_sat
+        #     * ck_elyte[self.index_Li]/self.c_li_sat)
 
-        print('S = ',S)
-        r_crit = (2.*self.gamma_surf*V / (RT * m.log(S)))  # critical radius, m
-        print('r_crit = ', r_crit)
-        N_crit = 2./3.*m.pi*r_crit**3./V # number of kmoles Li2O2 in the critical nucleus of size
-        
-        # Free energy associated with creation of critical nucleus:
-        # J kmol-1 // energy barrier of the nucleation
-        if N_crit <0:
-            dG_crit = 0
-        else:
+        if S > 1.00001:
+            r_crit = (2.*self.gamma_surf*V / (RT * m.log(S)))  # critical radius, m
+            # number of nucleation sites per unit geometric area
+            N_sites = A_surf_ratio/(m.pi*r_crit**2)/ct.avogadro
+            N_crit = 2./3.*m.pi*r_crit**3./V # number of kmoles Li2O2 in the critical nucleus with radius r_crit
+            # Free energy associated with creation of critical nucleus:
+            # J kmol-1 // energy barrier of the nucleation
             dG_crit = self.phi*4./3.*m.pi*self.gamma_surf*r_crit**2. 
-
-        Z = m.sqrt(dG_crit/(self.phi*3*m.pi*RT*N_crit)) 
+            #Zeldovich factor
+            Z = m.sqrt(dG_crit/(self.phi*3*m.pi*RT*N_crit)) 
+        else:
+            r_crit = 0
+            N_sites = 0
+            N_crit = 0
+            dG_crit = 0
+            Z = 0        
         
         # - // Zeldovich factor #forgot how to fix, DeCaluwe should commit his code
         # V_crit = 2./3.*m.pi*r_crit**3. # m3 // Critical volume
-         # number of nucleation sites per unit geometric area
-        N_sites = A_surf_ratio/(m.pi*r_crit**2)
         #m-2 [total area]
         
         #nucleation rate calculated based on the distance between particles
         k_nuc= self.d_li*(a_d**-2)  #nucleations/s
 
-        factor = 1.e-6
-        DN_Dt = factor*k_nuc*N_sites*Z*m.exp(-dG_crit/RT) #nuc/m2
+        factor =1.0# m.tanh((S-1.00001)/1.00001)# 1e-15
+        
+        # print(k_nuc)
+        # print(N_sites)
+        # print(Z)
+        # print(m.exp(-dG_crit/RT))
+        # print(m.exp(0.5*ct.faraday*phi_dl/RT))
+        DN_Dt = (factor*k_nuc*N_sites*Z*m.exp(-dG_crit/RT) 
+            * m.exp(0.5*ct.faraday*phi_dl/RT))#nuc/m2
         
         #DN_Dt = DN_Dt*m.exp(2.*0.5*8.854E-12*2.91/(ct.boltzmann*params['T']))*m.exp(0.5*8.854E-12*phi_elyte/(ct.boltzmann*params['T']))
         #calculate for loop to get Histogram
@@ -276,23 +293,43 @@ class electrode():
                     dNp_dt[i] += DN_Dt
                     break    
         for i, N in enumerate(N_p):
-            Dr_dt[i] =  (self.d_li * V 
-                * (ck_elyte[self.index_LiO2]- self.c_li_sat)
-                *(ck_elyte[self.index_LiO2] - self.c_liO2_sat)
-                / (self.r_p[i] + self.d_li/self.k_surf)
-                - m.pi * self.r_p[i]**2 * N * self.gamma_surf * self.k_surf_des)
-            dNdt_radii = Dr_dt[i]/self.bin_width*N
-            if dNdt_radii <0:
-                dNp_dt[i] += dNdt_radii
+            Dr_dt =  (1e5 * N * self.d_li * V 
+                * (ck_elyte[self.index_Li])
+                * (ck_elyte[self.index_LiO2])
+                *  m.exp(0.5*ct.faraday*phi_dl/RT)
+                / (self.r_p[i] + self.d_li/self.k_surf) 
+                - m.pi * self.r_p[i]**2 * N * self.gamma_surf * self.k_surf_des
+                * m.exp(-0.5*ct.faraday*phi_dl/RT))
+            # Dr_dt =  (self.d_li * V 
+            #     * (ck_elyte[self.index_Li]- self.c_li_sat)
+            #     *(ck_elyte[self.index_LiO2] - self.c_liO2_sat)
+            #     / (self.r_p[i] + self.d_li/self.k_surf)
+            #     - m.pi * self.r_p[i]**2 * N * self.gamma_surf * self.k_surf_des)
+            # Dr_dt[i] =  (self.d_li * V 
+            #     * (ck_elyte[self.index_Li]- self.c_li_sat)
+            #     *(ck_elyte[self.index_LiO2] - self.c_liO2_sat)
+            #     / (self.r_p[i] + self.d_li/self.k_surf) 
+            #     * m.exp(0.5*ct.faraday*phi_dl/RT)
+            #     - m.pi * self.r_p[i]**2 * N * self.gamma_surf * self.k_surf_des
+            #     * m.exp(-0.5*ct.faraday*phi_dl/RT))
+            dNdt_radii[i] = Dr_dt / self.bin_width
+            if dNdt_radii[i] < 0 and N > 0:
+                dNp_dt[i] += dNdt_radii[i]
                 if i > 0:
-                    dNp_dt[i-1] -= dNdt_radii
-            elif dNdt_radii > 0 and self.r_p[i] != self.r_p[-1]:
-                dNp_dt[i] -= dNdt_radii
-                dNp_dt[i+1] += dNdt_radii
+                    dNp_dt[i-1] -= dNdt_radii[i]
+            elif dNdt_radii[i] > 0 and self.r_p[i] != self.r_p[-1]:
+                dNp_dt[i] -= dNdt_radii[i]
+                dNp_dt[i+1] += dNdt_radii[i]
 
         # production rate for product species (kmol / m3 / s)
         dNdt_product = 2./3. * np.sum(dNp_dt * self.r_p**3) * np.pi / V
 
+        if 0:
+            print('S = ',S, m.log(S))
+            print('r_crit = ', r_crit)
+            print('A_avail = ', A_avail)
+            print('Nuc = ', DN_Dt)
+            print('Growth = ', max(abs(dNdt_radii)))
         # Production rate of electrons due to charge transfer reactions:
         sdot_electron = self.surf_obj.get_net_production_rates(self.host_obj) #kmol m-2 s-2
         
@@ -300,7 +337,7 @@ class electrode():
         # (Li transferred to the electrode)
         i_Far = -(ct.faraday * (sdot_electron - dNdt_product/A_surf_ratio)) #[A m-2 of host electrolyte interface]
         i_dl = self.i_ext_flag*i_io/A_surf_ratio - i_Far #does this need to be changed? #units of i_io?? A m-2 surface area
-        print('i_Far = ', i_Far, 'i_dl = ', i_dl)
+        # print('i_Far = ', i_Far, 'i_dl = ', i_dl)
         
         # Differential equation for the double layer potential:
         resid[SVptr['phi_dl']] = \

@@ -46,7 +46,7 @@ def run(SV_0, an, sep, ca, algvars, params):
                 ['phi-cutoff-upper'])
 
     # Set up the differential algebraic equation (dae) solver:
-    options =  {'user_data':(an, sep, ca, params), 'rtol':1e-4, 'atol':1e-7, 
+    options =  {'user_data':(an, sep, ca, params), 'rtol':1e-5, 'atol':1e-8, 
             'algebraic_vars_idx':algvars, 'first_step_size':1e-18, 
             'rootfn':terminate_check, 'nr_rootfns':2, 'compute_initcond':'yp0'}
     solver = dae('ida', residual, **options)
@@ -60,6 +60,7 @@ def run(SV_0, an, sep, ca, algvars, params):
         print('    Current = ', round(currents[i],3),'A/m^2 \n')
         
         t_out = np.linspace(0, times[i], 10000)
+        print('    Target time = ', times[i])
         
         # Create an initial array of time derivatives and runs the integrator:
         SVdot_0 = np.zeros_like(SV_0)
@@ -249,6 +250,6 @@ def output(solution, an, sep, ca, params):
     fig.tight_layout()
     
     # Save figure:
-    plt.savefig('output.pdf')
+    plt.savefig(params['save_name']+'_output.pdf')
     if params['outputs']['show-plots']:
         plt.show()
