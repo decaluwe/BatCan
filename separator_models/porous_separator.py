@@ -254,20 +254,22 @@ class separator():
         axs[ax_offset].set_ylabel('Separator Potential \n(V)')
         
         # Axis 5: Li+ concentration:
+        ax_offset += 1
         Ck_elyte_an = solution[an.SVptr['C_k_elyte'][0]+2,:]
-        axs[ax_offset+1].plot(solution[0,:]/3600, Ck_elyte_an[an.index_Li,:],
+        axs[ax_offset].plot(solution[0,:]/3600, Ck_elyte_an[an.index_Li,:],
             label="an interface")
 
         if 1:
             Ck_elyte_sep_ptr = np.add(self.SV_offset+self.SVptr['C_k_elyte'],2)
             for j in np.arange(self.n_points):
-                axs[ax_offset+1].plot(solution[0,:]/3600, 
+                axs[ax_offset].plot(solution[0,:]/3600, 
                     solution[Ck_elyte_sep_ptr[j, self.index_Li],:], 
                     label="separator "+str(j+1))
+        
+        for j in range(ca.n_y):
+            Ck_elyte_ca = solution[ca.SV_offset+ca.SVptr['C_k_elyte'][j]+2,:]
+            axs[ax_offset].plot(solution[0,:]/3600, Ck_elyte_ca[ca.index_Li,:])
 
-        Ck_elyte_ca = solution[ca.SV_offset+ca.SVptr['C_k_elyte'][0]+2,:]
-        axs[ax_offset+1].plot(solution[0,:]/3600, Ck_elyte_ca[ca.index_Li,:])
-
-        axs[ax_offset+1].set_ylabel('Li+ concentration \n(kmol/m$^3$')
+        axs[ax_offset].set_ylabel('Li+ concentration \n(kmol/m$^3$')
 
         return axs

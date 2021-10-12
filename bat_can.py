@@ -81,7 +81,6 @@ def bat_can(inputfile = None):
     solution = model.run(SV_0, an, sep, ca, algvars, parameters)
     
     dt = datetime.now()
- 
     dt_string = dt.strftime("%d%m%Y_%H%M")
     parameters['save_name'] = ('outputs/'+inputfile+'_'+parameters['savename']
         +'_'+ dt_string)
@@ -91,10 +90,6 @@ def bat_can(inputfile = None):
     #   CREATE FIGURES AND SAVE ALL OUTPUTS
     #===========================================================================
     # Call any output routines related to the simulation type:
-    dt = datetime.now()
-    dt_string = dt.strftime("%d%m%Y_%H%M")
-    save_name = 'C:/Users/Mels/Code/BatCan/outputs' +input+'_'+dt_string
-    np.savetxt(save_name+".csv", solution, delimiter=",")
     model.output(solution, an, sep, ca, parameters)
 
 
