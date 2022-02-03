@@ -71,6 +71,8 @@ class electrode():
         self.d_interphase = inputs['d_interphase']
         # Number of discretized volumes:
         self.n_points = int(self.dy_elyte / self.d_interphase)
+        # Inverse thickness of each discretized volume:
+        self.dyInv = 1./self.d_interphase
 
         # Anode or cathode? Positive external current delivers positive charge 
         # to the anode, and removes positive charge from the cathode.
@@ -93,8 +95,9 @@ class electrode():
         # Tottal number of variables (extra 1 is for the electrode electric 
         # potential):
         self.n_vars = 1 + self.n_vars_node * self.n_points
-        # Number of plots produced (temporarily zero):
-        self.n_plots = 0
+        # Number of plots produced (temporarily two: (i) interphase species 
+        # concentration, (ii) interphase volume fraction vs. time):
+        self.n_plots = 2
         
         # Set the initial Cantera object states:
         # Electric potentials:
@@ -147,7 +150,7 @@ class electrode():
         # Concentration of electrons in the interphase.  Used to calcualte interphase electric potential, using the Poisson equation.
         self.SVptr['C_elec_interphase'] = np.arange(2, self.n_vars, self.n_vars_node, 
             dtype='int')
-        SV[self.SVptr['C_elec_interphase']] = inputs['phi_0'] 
+        SV[self.SVptr['C_elec_interphase']] = 0.
         
         # Molar concentration of interphase species (kmol / m3 of total volume):
         self.SVptr['C_k_interphase'] = np.ndarray(
@@ -224,37 +227,83 @@ class electrode():
 
         """Start at the separator boundary"""
         j = self.nodes[0]
-        # Flux of electrolyte species between the separator and the electrolyte 
-        # in the current electrode:
-        N_k_sep, i_io_sep = sep.electrode_boundary_flux(SV, self, params['T'])
-
-        # Read local interphase volume fraction:
-        C_k_interphase = SV_loc[SVptr['C_k_interphase'][:]]
+        # Flux of electrolyte species between the separator and the  
+        # electrolyte in the current electrode:
+        N_k_elyte_in, i_io_in = \
+            sep.electrode_boundary_flux(SV, self, params['T'])
+            
+        # Read local interphase volume composition, calculate volume fractions:
+        C_k_interphase = SV_loc[SVptr['C_k_interphase'][j,:]]
         eps_interphase = np.dot(self.interphase_obj.partial_molar_volumes,  
             C_k_interphase.T)
+        eps_elyte = 1. - eps_interphase
         
-        # Temporarily, only one node:
-        j = 0
+        # Read out local electrolyte composition:
+        C_k_elyte = SV_loc[SVptr['C_k_elyte'][j,:]]
+        
+        # Read out electric potentials:
         phi_ed = SV_loc[SVptr['phi_ed'][j]]
         phi_elyte = SV_loc[SVptr['phi_elyte'][j]]
         
         """ TEMPORARY PLACEHOLDER """
         phi_interphase = phi_ed
+        for j_next in self.nodes[1:]:
+            pass
 
+        # Set state of Cantera objects:
+        #  Electric potentials:
         self.collector_obj.electric_potential = phi_ed
         self.interphase_obj.electric_potential = phi_interphase
         self.conductor_obj.electric_potential = phi_interphase
         self.elyte_obj.electric_potential = phi_elyte
+        # Note we may want to implement a check to make sure sum(C_k) > 0, here.
+        #  SEI composition:
+        self.interphase_obj.X = C_k_interphase/sum(C_k_interphase)
+        #  Electrolyte composition:
+        self.elyte_obj.X = C_k_elyte/sum(C_k_elyte)
 
-        # The current in the interphase entering this volume is that produced by
-        #   charge-transfer reactions at the electrode-interphase interface:
-        i_el_in = (eps_interphase 
+        # Calculate reaction rates and associated currents:
+        #  The current in the interphase entering this volume is that produced 
+        #    by charge-transfer reactions at the electrode-interphase interface:
+        i_el_out = (eps_interphase 
             * self.collector_interphase.get_net_production_rates(
             self.collector_obj) * ct.faraday)
+
+        # interphase-electrolyte area per unit volume.  This is scaled by
+        #   (1 - eps_interphase)*f(eps_interphase) so that available area goes 
+        #   to zero as the sei volume fraction approaches either zero or one:
+        interphase_APV = ((self.eps_max - eps_interphase) * 
+            (self.dyInv * eps_elyte + 6. * eps_interphase * self.dyInv))
+
+        # Species production rates are per unit total volume:
+        rates_interphase_elyte = (interphase_APV *
+            self.interphase_elyte.get_net_production_rates(self.interphase_obj))
+        rates_interphase = (eps_interphase * 
+            self.interphase_obj.net_production_rates)
+        rates_elyte_interphase = (interphase_APV *
+            self.interphase_elyte.get_net_production_rates(self.elyte_obj))
+        rates_elyte = eps_elyte * self.elyte_obj.net_production_rates
+
+        # Change in interphase species concentrations (kmol / m3_total / s)
+        dCk_int_dt = rates_interphase + rates_interphase_elyte
+        resid[SVptr['C_k_interphase'][j]] = \
+            SVdot_loc[SVptr['C_k_interphase'][j]] - dCk_int_dt
         
+        # TEMPORARY:
+        N_k_elyte_out = np.zeros_like(N_k_elyte_in)
+        
+        dEps_elyte_dt = -np.dot(dCk_int_dt,
+            self.interphase_obj.partial_molar_volumes)
+        # Change in electrolyte species concentrations (kmol / m3_total / s)
+        dCk_elyte_dt = (rates_elyte + rates_elyte_interphase
+            + (N_k_elyte_in - N_k_elyte_out)*self.dyInv
+            - C_k_elyte * dEps_elyte_dt) / eps_elyte
+        resid[SVptr['C_k_elyte'][j]] = (SVdot_loc[SVptr['C_k_elyte'][j]] 
+            - dCk_elyte_dt)
+
+
         i_Far = 0
-        i_el_out = 0
-        i_dl = i_Far - i_el_in + i_el_out
+        i_el_in = 0
         # resid[SVptr['phi_dl']] = (SVdot_loc[SVptr['phi_dl']] 
         #     - i_dl * self.C_dl_bulk_Inv)
         # print(i_dl * self.C_dl_bulk_Inv)
@@ -270,7 +319,9 @@ class electrode():
             # the electrolyte electric potential (calculated as phi_ca + 
             # dphi_dl) produces the correct ionic current between the separator # and cathode:
             if params['boundary'] == 'current':
-                resid[SVptr['phi_ed']] = i_io_sep - params['i_ext']
+                # Total current (i_io + i_el) into the node equals i_ext:
+                i_el_out = params['i_ext']
+                resid[SVptr['phi_ed'][j]] =  i_io_in + i_el_in - i_el_out 
             elif params['boundary'] == 'potential':
                 # Potential at time t:
                 phi = np.interp(t, params['times'], params['potentials'])
@@ -284,7 +335,7 @@ class electrode():
             
             # Temporary: elyte electric potential must maintain charge 
             # neutrality:
-            resid[SVptr['phi_elyte']] = i_io_sep - i_el_in
+            resid[SVptr['phi_elyte']] = i_io_in - i_el_out
 
         
         return resid
@@ -315,10 +366,19 @@ class electrode():
 
         return phi_elyte
 
-    def output(self, axs, solution, ax_offset):
+    def output(self, axs, solution, ax_offset, SV_offset):
+        offset = SV_offset + self.SV_offset
+        for j in range(self.n_points):
+            Ck_interphase = \
+                solution[offset + self.SVptr['C_k_interphase'][j],:]
+            for k in range(self.interphase_obj.n_species):
+                axs[ax_offset].plot(solution[0,:]/3600, Ck_interphase[k,:])
 
-        # axs[ax_offset].plot(solution[0,:]/3600, 
-        #     1e6*solution[2+int(self.SVptr['thickness'])])
-        # axs[ax_offset].set_ylabel(self.name+' Thickness \n($\mu$m)')
+            eps_interphase = np.dot(Ck_interphase.T, 
+                self.interphase_obj.partial_molar_volumes)
+            axs[ax_offset+1].plot(solution[0,:]/3600, eps_interphase)
+
+        axs[ax_offset].set_ylabel('C_k interphase \n(kmol m$^{-3}$)')
+        axs[ax_offset+1].set_ylabel('Interface Volume\nFraction')
 
         return axs

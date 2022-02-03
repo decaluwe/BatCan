@@ -40,7 +40,7 @@ def run(SV_0, an, sep, ca, algvars, params, sim):
         return_val[1] = 1.0
 
     # Set up the differential algebraic equation (dae) solver:
-    options =  {'user_data':(an, sep, ca, params), 'rtol':1e-8, 'atol':1e-11, 
+    options =  {'user_data':(an, sep, ca, params), 'rtol':1e-6, 'atol':1e-8, 
             'algebraic_vars_idx':algvars, 'first_step_size':1e-18, 
             'rootfn':terminate_check, 'nr_rootfns':2, 'compute_initcond':'yp0'}
     solver = dae('ida', residual, **options)
@@ -371,7 +371,7 @@ def output(solution, an, sep, ca, params, sim):
 
     # Add any relevant anode, cathode, and separator plots: 
     axs = an.output(axs, solution, ax_offset=2)
-    axs = ca.output(axs, solution, ax_offset=2+an.n_plots)
+    axs = ca.output(axs, solution, ax_offset=2+an.n_plots, SV_offset=SV_offset)
     axs = sep.output(axs, solution, an, ca, SV_offset, 
         ax_offset=2+an.n_plots+ca.n_plots)
 
