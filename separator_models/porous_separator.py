@@ -246,14 +246,7 @@ class separator():
             axs[ax_offset].plot(solution[0,:]/3600, 
                 solution[phi_elyte_ptr[j],:])
         
-<<<<<<< HEAD
-        phi_ca = \
-            (solution[ca.SVptr['electrode'][ca.SVptr['phi_ed'][0]]+SV_offset,:] + solution[ca.SVptr['electrode'][ca.SVptr['phi_dl'][0]]+SV_offset,:])
-=======
         phi_ca = ca.elyte_potential(solution[2:],0)
-        # (solution[ca.SVptr['electrode'][ca.SVptr['phi_ed'][0]]+2,:] 
-        #     + solution[ca.SVptr['electrode'][ca.SVptr['phi_dl'][0]]+2,:])
->>>>>>> 91c3fae52 (Initial commit of nonintercalating_interphase)
         axs[ax_offset].plot(solution[0,:]/3600, phi_ca)
         axs[ax_offset].set_ylabel('Separator Potential \n(V)')
         

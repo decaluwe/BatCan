@@ -20,7 +20,7 @@ from math import ceil
 import numpy as np
 from scikits.odes.dae import dae
 
-def run(SV_0, an, sep, ca, algvars, params):
+def run(SV_0, an, sep, ca, algvars, params, sim):
     """ 
     Run the simulation
     """
@@ -51,7 +51,7 @@ def run(SV_0, an, sep, ca, algvars, params):
     """ Equilibration """
     # If requested by the user, begin with a hold at zero current, to 
     # equilibrate the system:
-    if params['simulation']['equilibrate']['enable']:
+    if sim['equilibrate']['enable']:
 
         params['boundary'] = 'current'
         params['i_ext'] = 0.0
@@ -89,7 +89,7 @@ def run(SV_0, an, sep, ca, algvars, params):
 
     """ Initial Potentiostatic Hold """
     # If requested by the user, begin, with a hold at a specified potential
-    if params['simulation']['initial-hold']['enable']:
+    if sim['initial-hold']['enable']:
 
         # Set the potential for the hold:
         params['potentials'] = \
@@ -125,7 +125,7 @@ def run(SV_0, an, sep, ca, algvars, params):
         
     """ Run the CV experiment:"""
     # Set up the array of times and potentials for the CV:
-    potentials, times = setup_cycles(params['simulation'])
+    potentials, times = setup_cycles(sim)
 
     # Save the array of potentials and times to the 'params' input:
     params['potentials'] = potentials
@@ -297,7 +297,7 @@ def data_prepare(i_step, solution, i_ext, data_out=None):
 
     return data_out, SV_0
 
-def output(solution, an, sep, ca, params):
+def output(solution, an, sep, ca, params, sim):
     """
     Prepare and save any output data to the correct location. Prepare, 
     create, and save any figures relevant to constant-current cycling.
@@ -309,7 +309,7 @@ def output(solution, an, sep, ca, params):
     # Re-read the time steps for the CV cycles: points where the potential hits 
     # voltage limits.  The function also retrns the potentials, but these are 
     # not required, here.
-    _, times = setup_cycles(params['simulation'])
+    _, times = setup_cycles(sim)
 
     # Find the step numbers where each cycle begins:
     indices, n_cycles = sort_cycles(solution, times)
@@ -351,6 +351,10 @@ def output(solution, an, sep, ca, params):
     # (this simulation produces 2: current and voltage, vs. time):
     n_plots = 2 + an.n_plots + ca.n_plots + sep.n_plots
 
+    # There are 2 variables stored before the state variables: (1) time (s), 
+    # and (2) current density(A/cm2)
+    SV_offset = 2
+
     # Initialize the figure:
     fig, axs = plt.subplots(n_plots, 1, sharex=True, 
             gridspec_kw = {'wspace':0, 'hspace':0})
@@ -368,7 +372,8 @@ def output(solution, an, sep, ca, params):
     # Add any relevant anode, cathode, and separator plots: 
     axs = an.output(axs, solution, ax_offset=2)
     axs = ca.output(axs, solution, ax_offset=2+an.n_plots)
-    axs = sep.output(axs, solution, an, ca, ax_offset=2+an.n_plots+ca.n_plots)
+    axs = sep.output(axs, solution, an, ca, SV_offset, 
+        ax_offset=2+an.n_plots+ca.n_plots)
 
     axs[n_plots-1].set(xlabel='Time (h)')
 
@@ -388,7 +393,7 @@ def output(solution, an, sep, ca, params):
     
     # Save figure:
     plt.savefig('output.pdf')
-    if params['outputs']['show-plots']:
+    if sim['outputs']['show-plots']:
         plt.show()
 
 def sort_cycles(solution, times):
