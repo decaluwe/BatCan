@@ -303,8 +303,12 @@ def output(solution, an, sep, ca, params, sim):
     create, and save any figures relevant to constant-current cycling.
     """
     #TODO #17
+    from datetime import datetime  
     import matplotlib.pyplot as plt 
     from matplotlib.ticker import FormatStrFormatter
+    import os
+    import pandas as pd
+
 
     # Re-read the time steps for the CV cycles: points where the potential hits 
     # voltage limits.  The function also retrns the potentials, but these are 
@@ -318,32 +322,28 @@ def output(solution, an, sep, ca, params, sim):
     phi_ptr = 2+ca.SV_offset+int(ca.SVptr['phi_ed'][:])
 
     # Plot CV curves:
-    fig, ax = plt.subplots(1,1)
-    fig.set_size_inches((4.0, 2.25))
+    CV_fig, CV_ax = plt.subplots(1,1)
+    CV_fig.set_size_inches((4.0, 2.25))
     for j in np.arange(n_cycles):
-        ax.plot(solution[phi_ptr,indices[j]:indices[j+1]], 
+        CV_ax.plot(solution[phi_ptr,indices[j]:indices[j+1]], 
             -0.1*solution[1,indices[j]:indices[j+1]],
             label='cycle '+str(j+1))
 
-    ax.set_ylabel('Current Density (mA/cm$^2$)')
-    ax.set_xlabel('Cell Potential (V)')
-    ax.legend(frameon=False)
+    CV_ax.set_ylabel('Current Density (mA/cm$^2$)')
+    CV_ax.set_xlabel('Cell Potential (V)')
+    CV_ax.legend(frameon=False)
 
     # Format axis ticks:
-    ax.tick_params(axis="x",direction="in")
-    ax.tick_params(axis="y",direction="in")
-    ax.get_yaxis().get_major_formatter().set_useOffset(False)
-    ax.yaxis.set_label_coords(-0.2, 0.5)
+    CV_ax.tick_params(axis="x",direction="in")
+    CV_ax.tick_params(axis="y",direction="in")
+    CV_ax.get_yaxis().get_major_formatter().set_useOffset(False)
+    CV_ax.yaxis.set_label_coords(-0.2, 0.5)
 
     # Round voltage values:
-    ax.yaxis.set_major_formatter(FormatStrFormatter('%.2f'))
+    CV_ax.yaxis.set_major_formatter(FormatStrFormatter('%.2f'))
 
     # Trim down whitespace:
-    fig.tight_layout()
-
-    # Save figure:
-    plt.savefig('cyclic_voltammogram.pdf')
-
+    CV_fig.tight_layout()
 
     # Create time-series subplots figure:
     lp = 30 #labelpad
@@ -356,45 +356,72 @@ def output(solution, an, sep, ca, params, sim):
     SV_offset = 2
 
     # Initialize the figure:
-    fig, axs = plt.subplots(n_plots, 1, sharex=True, 
+    summary_fig, summary_axs = plt.subplots(n_plots, 1, sharex=True, 
             gridspec_kw = {'wspace':0, 'hspace':0})
     
-    fig.set_size_inches((4.0,1.8*n_plots))
+    summary_fig.set_size_inches((4.0,1.8*n_plots))
  
     # Axis 1: Current vs. capacity
-    axs[0].plot(solution[0,:]/3600, (1000*solution[1,:]/10000))
-    axs[0].set_ylabel('Current Density \n (mA/cm$^2$)',labelpad=lp)
+    summary_axs[0].plot(solution[0,:]/3600, (1000*solution[1,:]/10000))
+    summary_axs[0].set_ylabel('Current Density \n (mA/cm$^2$)',labelpad=lp)
     
     # Axis 2: Charge/discharge potential vs. capacity.
-    axs[1].plot(solution[0,:]/3600, solution[phi_ptr,:])
-    axs[1].set_ylabel('Cell Potential \n(V)')#,labelpad=lp)
+    summary_axs[1].plot(solution[0,:]/3600, solution[phi_ptr,:])
+    summary_axs[1].set_ylabel('Cell Potential \n(V)')#,labelpad=lp)
 
     # Add any relevant anode, cathode, and separator plots: 
-    axs = an.output(axs, solution, ax_offset=2)
-    axs = ca.output(axs, solution, ax_offset=2+an.n_plots, SV_offset=SV_offset)
-    axs = sep.output(axs, solution, an, ca, SV_offset, 
+    summary_axs = an.output(summary_axs, solution, ax_offset=2)
+    summary_axs = ca.output(summary_axs, solution, ax_offset=2+an.n_plots,  
+        SV_offset=SV_offset)
+    summary_axs = sep.output(summary_axs, solution, an, ca, SV_offset, 
         ax_offset=2+an.n_plots+ca.n_plots)
 
-    axs[n_plots-1].set(xlabel='Time (h)')
+    summary_axs[n_plots-1].set(xlabel='Time (h)')
 
     # Format axis ticks:
     for i in range(n_plots):
-        axs[i].tick_params(axis="x",direction="in")
-        axs[i].tick_params(axis="y",direction="in")
+        summary_axs[i].tick_params(axis="x",direction="in")
+        summary_axs[i].tick_params(axis="y",direction="in")
         if i: # Skip the first plot, which is log scale:
-            axs[i].get_yaxis().get_major_formatter().set_useOffset(False)
-        axs[i].yaxis.set_label_coords(-0.2, 0.5)
+            summary_axs[i].get_yaxis().get_major_formatter().set_useOffset(False)
+        summary_axs[i].yaxis.set_label_coords(-0.2, 0.5)
 
     # Round voltage values:
-    axs[1].yaxis.set_major_formatter(FormatStrFormatter('%.2f'))
+    summary_axs[1].yaxis.set_major_formatter(FormatStrFormatter('%.2f'))
 
     # Trim down whitespace:
-    fig.tight_layout()
+    summary_fig.tight_layout()
+
+    # Save the solution as a Pandas dataframe:
+    labels = (['current'] + an.SVnames + sep.SVnames 
+        + ca.SVnames)
+    solution_df = pd.DataFrame(data = solution.T[:,1:],
+                                index = solution.T[:,0],
+                                columns = labels)
+
+    solution_df.index.name = 'time (s)'       
     
-    # Save figure:
-    plt.savefig('output.pdf')
-    if sim['outputs']['show-plots']:
+    # If no specification is given on whether to show plots, assume 'True'
+    now = datetime.now()
+    dt =  now.strftime("%Y%m%d_%H%M")
+    if 'outputs' not in sim:
+        filename = ('outputs/'+'_'+params['input']+'_'+dt)
+        os.makedirs(filename)
+        summary_fig.savefig(filename+'/summary.pdf')
+        CV_fig.savefig(filename+'/CV.pdf')
         plt.show()
+    else:
+        if sim['outputs']['savename']:
+            filename = ('outputs/'+sim['outputs']['savename']+'_'
+                +params['input']+'_'+dt)
+            os.makedirs(filename)
+            solution_df.to_pickle(filename+'/output.pkl')
+            solution_df.to_csv(filename+'/output.csv', sep=',')
+            summary_fig.savefig(filename+'/summary.pdf')
+            CV_fig.savefig(filename+'/cycles.pdf')
+        
+        if 'show-plots' not in sim['outputs'] or sim['outputs']['show-plots']:
+            plt.show()
 
 def sort_cycles(solution, times):
     """
