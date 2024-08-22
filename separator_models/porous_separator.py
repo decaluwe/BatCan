@@ -31,6 +31,7 @@ class separator():
 
         self.index_Li_elyte = \
             self.elyte_obj.species_index(inputs['transport']['mobile-ion'])
+        self.index_Li = self.index_Li_elyte
 
         # Process transport inputs:
         if inputs['transport']['model']=='dilute-solution':
@@ -38,9 +39,12 @@ class separator():
 
             self.elyte_transport = transport.dilute_solution
             self.D_k = np.zeros_like(self.elyte_obj.X)
+            self.C_k_0 = np.zeros_like(self.elyte_obj.X)
             for item in inputs['transport']['diffusion-coefficients']:
                 self.D_k[self.elyte_obj.species_index(item['species'])] = \
                     item['D_k']
+                self.C_k_0[self.elyte_obj.species_index(item['species'])] = \
+                    item['C_k']
         else:
             raise ValueError('Please specify a valid electrolyte transport ',
                 'model.')
