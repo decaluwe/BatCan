@@ -21,6 +21,7 @@ from bat_can_init import initialize
 def bat_can(input, cores):
     # Record the start time:
     start = timeit.default_timer()
+    print("starting...")
 
     if input is None:
         # Default is a single-particle model of graphite/LCO
@@ -39,6 +40,8 @@ def bat_can(input, cores):
     #   READ IN USER INPUTS
     #===========================================================================
     an_inputs, sep_inputs, ca_inputs, parameters = initialize(input_file)
+
+    print("model initialized...")
 
     now = datetime.now()
     dt =  now.strftime("%Y%m%d_%H%M")
