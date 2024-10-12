@@ -14,7 +14,7 @@ import numpy as np
 
 class electrode():
     """
-    Create an electrode object representing the single particle electrode.
+    Create an electrode object representing a phase conversion electrode.
     """
 
     def __init__(self, input_file, inputs, sep_inputs, counter_inputs,
