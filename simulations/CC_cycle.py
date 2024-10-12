@@ -13,7 +13,7 @@
     The methods 'run' and 'ouput' are called by bat_can.py.  All other functions are called internally.
 
 """
-from matplotlib.ticker import ScalarFormatter 
+from matplotlib.ticker import ScalarFormatter
 import numpy as np
 from scikits.odes.dae import dae
 from math import floor
@@ -68,7 +68,7 @@ def run(SV_0, an, sep, ca, algvars, params, sim):
     # Set up the differential algebraic equation (dae) solver:
     options =  {'user_data':(an, sep, ca, params), 'rtol':1e-5, 'atol':1e-7,
             'algebraic_vars_idx':algvars, 'first_step_size':1e-12,
-            'rootfn':terminate_check, 'nr_rootfns':n_roots, 'compute_initcond':'yp0', 'max_steps':10000, 
+            'rootfn':terminate_check, 'nr_rootfns':n_roots, 'compute_initcond':'yp0', 'max_steps':10000,
             'linsolver':'band', 'lband':lband, 'uband':uband}
 
     solver = dae('ida', residual, **options)
@@ -82,7 +82,7 @@ def run(SV_0, an, sep, ca, algvars, params, sim):
         print('    Current = ', round(currents[i],3),'A/m^2 \n')
 
         t_out = np.linspace(0, times[i], 10000)
-        
+
         # Create an initial array of time derivatives and runs the integrator:
         SVdot_0 = np.zeros_like(SV_0)
         solver.init_step(0.0, SV_0, SVdot_0)
@@ -130,7 +130,7 @@ def calc_current(params, an, ca):
         # User cannot set both i_ext and C-rate. Throw an error, if they have:
         if params['C-rate'] is not None:
             raise ValueError("Both i_ext and C-rate are specified. "
-                "Please specify only one of the two in your input file.")
+                "Please specify only one of the two in your input file. Provide 'None' (no quotation marks) as the value of the other.")
         else:
             # Read the current and units, and convert the units, if necessary.
             # Read in the user input:
@@ -370,7 +370,7 @@ def plot(an, sep, ca, params, sim):
 
         cycle_fig.set_size_inches((4.0,2.0))
 
-        # iterate over cycles:        
+        # iterate over cycles:
         for i in range(int(solution[1,-1])):
             cycle = solution_df[solution_df.iloc[:,0] == i+1]
             # All times are relative to the start of the step:
